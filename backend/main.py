@@ -51,9 +51,8 @@ def get_engine():
 
 @app.on_event("startup")
 async def startup_event():
-    # Attempt early initialization in background thread
-    import threading
-    threading.Thread(target=get_engine).start()
+    # Initialize engine synchronously for better error capture
+    get_engine()
 
 class PatientData(BaseModel):
     filters: Dict[str, Any]
@@ -92,33 +91,71 @@ async def match_trials(patient_data: PatientData):
         raise HTTPException(status_code=503, detail=f"Matching engine is not initialized. Error: {engine_initialization_error}")
     
     try:
-        # Load NCT IDs from metadata
+        # Load NCT IDs and metadata from local CSV
         df_trials = pd.read_csv(TRIAL_METADATA_PATH)
-        # For performance, only match the top few for now (can be adjusted)
-        nct_ids = df_trials['nct_id'].tolist()[:20]  # Just 20 for matching demo speed
+        
+        # Use existing criteria from the CSV instead of downloading them
+        # This is much faster and more reliable
+        results = []
 
-        patient_dict = patient_data.filters
-        # Provide some dummy values if fields are missing (though UI should handle this)
-        # Actually, let's keep it robust
-        results_df = engine.Match(patient_dict, docx_trials=[], ctgov_trials=nct_ids)
-        
-        # Merge with metadata for richer results
-        results_full = pd.merge(results_df, df_trials, left_on='Trial ID', right_on='nct_id')
-        
-        # Format results for the frontend
-        formatted_results = []
-        for _, row in results_full.iterrows():
-            formatted_results.append({
-                "trial_id": row["Trial ID"],
-                "trial_name": row["nct_id"], # or use a name column if available
-                "match_score": row["Match Score"],
-                "criteria_summary": row["./eligibility/criteria/textblock"][:200] + "...",
-                "trial_link": f"https://clinicaltrials.gov/ct2/show/{row['Trial ID']}"
-            })
-            
+        for _, row in df_trials.iterrows():
+            try:
+                # Prepare trial info dict from local data
+                trial_info = {
+                    "NCT_id": row["nct_id"],
+                    "condition": [str(row["condition"])],
+                    "./eligibility/minimum_age": str(row["./eligibility/minimum_age"]),
+                    "./eligibility/maximum_age": str(row["./eligibility/maximum_age"]),
+                    "./eligibility/criteria/textblock": str(row["./eligibility/criteria/textblock"])
+                }
+                
+                # Match using the engine's internal scoring but on pre-loaded data
+                raw_text = trial_info["./eligibility/criteria/textblock"]
+                ext_criteria = engine.ExtractCriteria(text=raw_text, mode='ctgov')
+                
+                # Split based on extraction logic
+                if isinstance(ext_criteria, list) and len(ext_criteria) > 0 and isinstance(ext_criteria[0], list):
+                    inclusion = ext_criteria[0]
+                    exclusion = ext_criteria[1]
+                else:
+                    inclusion = ext_criteria
+                    exclusion = []
+
+                # Clean and Embed (Using engine methods)
+                clean_in = engine.CleanCriteria(inclusion)
+                clean_ex = engine.CleanCriteria(exclusion)
+                
+                if clean_in.empty and clean_ex.empty:
+                    match_score = 0.0
+                else:
+                    embedded_in = engine.EmbedCriteria(CleanedCriteria=clean_in['Final']) if not clean_in.empty else pd.DataFrame()
+                    embedded_ex = engine.EmbedCriteria(CleanedCriteria=clean_ex['Final']) if not clean_ex.empty else pd.DataFrame()
+                    
+                    classified_in = engine.ClassifyCriteria(criteria=clean_in['Original'], embeddings=embedded_in['Embedding'], model_folder_path=SVM_MODELS_DIR) if not embedded_in.empty else pd.DataFrame()
+                    classified_ex = engine.ClassifyCriteria(criteria=clean_ex['Original'], embeddings=embedded_ex['Embedding'], model_folder_path=SVM_MODELS_DIR) if not embedded_ex.empty else pd.DataFrame()
+                    
+                    classified_df = pd.concat([classified_in, classified_ex])
+                    match_score = engine.ComputeMatchScore(patient_data.filters, inclusion + exclusion, trial_info, classified_df)
+                
+                # Format for frontend
+                results.append({
+                    "trial_id": row["nct_id"],
+                    "trial_name": row["nct_id"],
+                    "match_score": match_score,
+                    "criteria_summary": str(row["./eligibility/criteria/textblock"])[:200] + "...",
+                    "trial_link": f"https://clinicaltrials.gov/ct2/show/{row['nct_id']}"
+                })
+            except Exception as inner_e:
+                logger.warning(f"Error matching trial {row['nct_id']}: {inner_e}")
+                continue
+
+        # Sort by match score
+        formatted_results = sorted(results, key=lambda x: x["match_score"], reverse=True)[:50]
         return {"results": formatted_results}
     except Exception as e:
+        import traceback
         logger.error(f"Error during matching: {e}")
+        logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
