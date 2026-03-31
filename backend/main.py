@@ -166,14 +166,19 @@ async def match_trials(patient_data: PatientData):
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
-# Serve Frontend
-# Specifically handle root to serve index.html
-@app.get("/")
-async def read_index():
-    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+# Assets
+if os.path.exists(os.path.join(STATIC_DIR, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
 
-# Mount everything else (assets, etc.)
-app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+# Catch-all for Frontend
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    # Skip API routes explicitly
+    if full_path.startswith("filters") or full_path.startswith("match"):
+        raise HTTPException(status_code=404)
+        
+    index_file = os.path.join(STATIC_DIR, "index.html")
+    return FileResponse(index_file)
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)
