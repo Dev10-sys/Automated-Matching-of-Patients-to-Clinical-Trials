@@ -6,8 +6,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
-      '/filters': 'http://localhost:8000',
-      '/match': 'http://localhost:8000',
+      '/filters': 'http://127.0.0.1:8000',
+      '/match': 'http://127.0.0.1:8000',
     }
   }
 })
