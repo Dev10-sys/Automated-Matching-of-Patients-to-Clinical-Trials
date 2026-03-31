@@ -1,98 +1,64 @@
-# GEARBOx: Automated Matching of Patients to Clinical Trials
+# GEARBOx: Automated Clinical Trial Matching Engine
 
-GEARBOx is an open-source clinical trial matching engine that utilizes Natural Language Processing (NLP) and Support Vector Machines (SVM) to automate the enrollment process. By parsing trial eligibility criteria and mapping them to patient characteristics, it provides a ranked list of matched trials for hematologic malignancies.
+GEARBOx is an open-source matching engine designed to automate the screening of patients for clinical trials using Natural Language Processing (NLP) and Support Vector Machines (SVM). It enables efficient enrollment by parsing trial eligibility and mapping them to specific patient characteristics.
 
 ## Project Overview
 
-The current user interface replaces the traditional long-form questionnaire with a modern, dynamic, and filter-based search experience. Medical professionals can now input specific patient data using a typeahead interface, selecting only the filters they have data for, which drastically reduces input overhead and improves matching efficiency.
+The current implementation provides a modern, filter-driven dashboard that eliminates the need for manual, long-form screening questionnaires. By utilizing a typeahead search interface, medical professionals can input only the specific patient attributes they have data for, significantly improving matching precision and reducing cognitive load.
 
-### Key Features
-- **Dynamic Filter Selection**: Select patient filters (Age, Diagnosis, Performance Status, etc.) only when data is available.
-- **NLP Matching Engine**: Uses FastText embeddings and specialized SVM classifiers to categorize trial criteria.
-- **Automated Score Calculation**: Matches are scored and ranked according to the relevance and potential eligibility.
-- **Rich Dashboard UI**: A premium, responsive interface built with React and TypeScript.
+### Key Technical Features
+*   **Dynamic Data Attributes**: Search and selectively add patient parameters (Age, Performance Status, Clinical Diagnosis, etc.).
+*   **Vectorization & Embedding**: Utilizes FastText embeddings for semantic understanding of eligibility criteria.
+*   **Multi-Class Classification**: Employs 17 specialized SVM models to categorize criteria across key medical domains (e.g., Renal, Hepatic, Prior Therapy).
+*   **Ranking Algorithm**: Computes a composite match score to rank clinical trials based on patient-to-criteria compatibility.
+*   **Decoupled Architecture**: High-performance FastAPI backend interface and a responsive React/TypeScript frontend implementation.
 
----
-
-## 🏗️ System Architecture
+## System Architecture
 
 ```mermaid
 graph TD
-    User([Medical Professional]) --> Frontend[React/TypeScript UI]
-    Frontend -->|REST API| API[FastAPI Backend]
-    API -->|Fetch Criteria| CTGov[ClinicalTrials.gov / Protocol Files]
-    API -->|Init| Wrapper[gearboxNLP Wrapper]
-    Wrapper -->|Preprocess| NLP[NLTK & Lemmatization]
-    NLP -->|Vectorization| FT[FastText Embeddings]
-    FT -->|Classification| SVM[17x SVM Categories]
-    SVM -->|Scoring| Matcher[Matching Logic]
-    Matcher -->|Ranked Result| API
-    API -->|JSON Response| Frontend
+    User[Medical Professional] --> Frontend[React Dashboard]
+    Frontend -->|REST API| API[FastAPI Server]
+    API -->|Fetch Trial Data| CTGov[ClinicalTrials.gov Data]
+    API -->|Initialize| Matcher[Matching Engine Wrapper]
+    Matcher -->|Feature Extraction| NLP[NLTK Processing]
+    NLP -->|Embedding| FT[FastText Model]
+    FT -->|Inference| SVM[SVM Classifiers]
+    SVM -->|Ranking| Scorer[Scoring Logic]
+    Scorer --> API
+    API -->|Ranked Response| Frontend
 ```
 
----
+## Setup and Installation
 
-## 🚀 Getting Started
+### Backend Requirements
+*   Python 3.9 or higher
+*   Required packages: `fastapi`, `uvicorn`, `pandas`, `nltk`, `gensim`, `scikit-learn`, `joblib`
+*   Pre-trained models must be available in the `trained_ML_models/` directory.
 
-### Prerequisites
-- Python 3.9 or higher
-- Node.js (v18+) and npm
-- `nltk` data resources
+### Frontend Requirements
+*   Node.js and npm
+*   Built with React, TypeScript, and Vite.
 
-### Backend Installation
-1.  Navigate into the `backend/` directory.
-2.  Install required dependencies:
-    ```bash
-    pip install -r backend/requirements.txt
-    ```
-3.  The ML models should be located in `trained_ML_models/` as categorized by FastText and SVM directories.
+### Local Execution Instructions
 
-### Frontend Installation
-1.  Navigate into the `frontend/` directory.
-2.  Install npm packages:
-    ```bash
-    npm install
-    ```
+For simplified local development, use the following operational scripts:
 
----
+- **Windows**:
+  - Run `run_backend.bat` for the API server.
+  - Run `run_frontend.bat` for the React dashboard.
+- **Linux/macOS**:
+  - Run `run_backend.sh` for the API server.
+  - Run `run_frontend.sh` for the React dashboard.
 
-## 🛠️ Usage
+Access the dashboard at `http://localhost:5173`.
 
-For convenience, ready-to-use launch scripts are provided for both Windows and Linux/Bash.
+## API Documentation
 
-- **To run the Backend**: Run `run_backend.sh` or `run_backend.bat`.
-- **To run the Frontend**: Run `run_frontend.sh` or `run_frontend.bat`.
+| Endpoint | Method | Input | Description |
+| :------- | :----- | :---- | :---------- |
+| `/filters` | GET | N/A | Returns list of patient attributes used for matching. |
+| `/match` | POST | JSON | Submits patient data and returns ranked clinical trials. |
 
-Once both services are running, the application will be accessible at: `http://localhost:5173`.
-
-### Backend API Endpoints
-
-| Endpoint | Method | Description |
-| :------- | :----- | :---------- |
-| `/filters` | `GET` | Fetches all available patient data filters used for matching. |
-| `/match` | `POST` | Processes patient characteristics and returns a ranked list of trial matches. |
-
----
-
-## 📈 Methodology
-
-The matching engine follows a robust four-step process:
-1.  **Trial Info Fetching**: Direct XML retrieval from `clinicaltrials.gov`.
-2.  **Criteria Extraction**: Segmenting text blocks into individual eligibility points.
-3.  **Classification**: Using SVMs to identify critical categories (e.g., Renal Function, Hepatic Function, CNS Involvement).
-4.  **Mathematical Scoring**: Calculating a composite score of matches vs. potentials, weighted by criteria relevance.
-
----
-
-## 🤝 Contributions
-
-We welcome contributions from the community! Please ensure that any PRs follow the existing architecture and includes tests for any new matching logic categories.
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details (if available).
-
-## Project Maintainer Note
-This modern UI is an enhancement designed for efficiency in clinical settings, maintaining full stability with the original GEARBOx NLP research models.
+## Methodology Note
+The matching logic is derived from validated research models. Criteria segmentation and classification have been optimized for high performance, utilizing lemmatization and POS-tagging to ensure semantic accuracy before vectorization.
