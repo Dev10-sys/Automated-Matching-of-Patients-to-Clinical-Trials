@@ -1,0 +1,6 @@
+{
+  "filters": {
+    "Age (Days)": 5000,
+    "Diagnosis": "ALL"
+  }
+}

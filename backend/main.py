@@ -32,16 +32,28 @@ TRIAL_METADATA_PATH = os.path.join(PROJECT_DATA_DIR, "trial_metadata.csv")
 
 # Initialize matching engine
 engine = None
+engine_initialization_error = None
+
+def get_engine():
+    global engine, engine_initialization_error
+    if engine is not None:
+        return engine
+    
+    try:
+        logger.info("Initializing matching engine (lazy load)...")
+        engine = gearboxNLP(FT_MODEL_PATH, SVM_MODELS_DIR)
+        logger.info("Matching engine initialized successfully.")
+        return engine
+    except Exception as e:
+        engine_initialization_error = str(e)
+        logger.error(f"Failed to initialize matching engine: {e}")
+        return None
 
 @app.on_event("startup")
 async def startup_event():
-    global engine
-    try:
-        logger.info("Initializing matching engine...")
-        engine = gearboxNLP(FT_MODEL_PATH, SVM_MODELS_DIR)
-        logger.info("Matching engine initialized successfully.")
-    except Exception as e:
-        logger.error(f"Failed to initialize matching engine: {e}")
+    # Attempt early initialization in background thread
+    import threading
+    threading.Thread(target=get_engine).start()
 
 class PatientData(BaseModel):
     filters: Dict[str, Any]
@@ -75,8 +87,9 @@ async def get_filters():
 @app.post("/match")
 async def match_trials(patient_data: PatientData):
     """Matches a patient to clinical trials using the engine."""
-    if engine is None:
-        raise HTTPException(status_code=503, detail="Matching engine is not initialized.")
+    current_engine = get_engine()
+    if current_engine is None:
+        raise HTTPException(status_code=503, detail=f"Matching engine is not initialized. Error: {engine_initialization_error}")
     
     try:
         # Load NCT IDs from metadata
