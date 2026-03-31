@@ -18,8 +18,9 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="GEARBOx Clinical Trial Matching API")
 
 # Setup folder paths
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STATIC_DIR = os.path.join(BASE_DIR, "backend", "static")
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BACKEND_DIR, "static")
+BASE_DIR = os.path.dirname(BACKEND_DIR)
 
 # Add CORS middleware
 app.add_middleware(
@@ -166,16 +167,14 @@ async def match_trials(patient_data: PatientData):
         raise HTTPException(status_code=500, detail=str(e))
 
 # Serve Frontend
-# Put this at the end to not catch API routes
 if os.path.exists(STATIC_DIR):
+    # Specifically handle root to serve index.html
+    @app.get("/")
+    async def read_index():
+        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+    
+    # Mount everything else (assets, etc.)
     app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
-
-@app.get("/{full_path:path}")
-async def serve_frontend(full_path: str):
-    index_file = os.path.join(STATIC_DIR, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-    return {"error": "Frontend not built"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)
