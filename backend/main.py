@@ -7,11 +7,19 @@ import pandas as pd
 import logging
 from matching_engine_wrapper import gearboxNLP
 
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import uvicorn
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="GEARBOx Clinical Trial Matching API")
+
+# Setup folder paths
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+STATIC_DIR = os.path.join(BASE_DIR, "backend", "static")
 
 # Add CORS middleware
 app.add_middleware(
@@ -23,7 +31,6 @@ app.add_middleware(
 )
 
 # Constants
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODELS_DIR = os.path.join(BASE_DIR, "trained_ML_models")
 FT_MODEL_PATH = os.path.join(MODELS_DIR, "fasttext", "ft_embedding_size256_window5.model")
 SVM_MODELS_DIR = os.path.join(MODELS_DIR, "SVMs", "classifier_models")
@@ -158,6 +165,17 @@ async def match_trials(patient_data: PatientData):
         logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
 
+# Serve Frontend
+# Put this at the end to not catch API routes
+if os.path.exists(STATIC_DIR):
+    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    index_file = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return {"error": "Frontend not built"}
+
 if __name__ == "__main__":
-    import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
