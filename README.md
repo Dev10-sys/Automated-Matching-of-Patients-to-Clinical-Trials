@@ -1,132 +1,98 @@
-# GEARBOx Clinical Trial Matching System
+# GEARBOx: Automated Matching of Patients to Clinical Trials
 
-GEARBOx is an automated matching system that uses Natural Language Processing (NLP) and Machine Learning (ML) to match patients to oncology clinical trials based on complex eligibility criteria.
+GEARBOx is an open-source clinical trial matching engine that utilizes Natural Language Processing (NLP) and Support Vector Machines (SVM) to automate the enrollment process. By parsing trial eligibility criteria and mapping them to patient characteristics, it provides a ranked list of matched trials for hematologic malignancies.
 
-## System Architecture
+## Project Overview
+
+The current user interface replaces the traditional long-form questionnaire with a modern, dynamic, and filter-based search experience. Medical professionals can now input specific patient data using a typeahead interface, selecting only the filters they have data for, which drastically reduces input overhead and improves matching efficiency.
+
+### Key Features
+- **Dynamic Filter Selection**: Select patient filters (Age, Diagnosis, Performance Status, etc.) only when data is available.
+- **NLP Matching Engine**: Uses FastText embeddings and specialized SVM classifiers to categorize trial criteria.
+- **Automated Score Calculation**: Matches are scored and ranked according to the relevance and potential eligibility.
+- **Rich Dashboard UI**: A premium, responsive interface built with React and TypeScript.
+
+---
+
+## 🏗️ System Architecture
 
 ```mermaid
 graph TD
-    User([Medical Professional]) --> Frontend[React/Vite UI]
-    Frontend -->|POST /match| API[FastAPI Backend]
-    API -->|NCT IDs| Extractor[CT.gov / XML Extractor]
-    API -->|Process| Engine[gearboxNLP Engine]
-    Engine -->|Tokenize & Clean| NLP[NLTK Processing]
-    Engine -->|Embeddings| FT[FastText Model]
-    Engine -->|Classify| SVM[Multiple SVM Classifiers]
-    Engine -->|Score| Matcher[ComputeMatchScore]
-    Matcher -->|Result| API
-    API -->|JSON Result| Frontend
+    User([Medical Professional]) --> Frontend[React/TypeScript UI]
+    Frontend -->|REST API| API[FastAPI Backend]
+    API -->|Fetch Criteria| CTGov[ClinicalTrials.gov / Protocol Files]
+    API -->|Init| Wrapper[gearboxNLP Wrapper]
+    Wrapper -->|Preprocess| NLP[NLTK & Lemmatization]
+    NLP -->|Vectorization| FT[FastText Embeddings]
+    FT -->|Classification| SVM[17x SVM Categories]
+    SVM -->|Scoring| Matcher[Matching Logic]
+    Matcher -->|Ranked Result| API
+    API -->|JSON Response| Frontend
 ```
 
-## Features
+---
 
-- **Dynamic Filter Search**: Users can search for specific patient characteristics only when they have data for them.
-- **Automated Score Calculation**: Matches are ranked based on a percentage score derived from eligibility criteria classification.
-- **Protocol Summaries**: Quick link to trial protocols and short criteria summaries.
-- **Minimal, Production-Ready UI**: Designed for efficiency in clinical settings.
+## 🚀 Getting Started
 
-## Backend Setup
+### Prerequisites
+- Python 3.9 or higher
+- Node.js (v18+) and npm
+- `nltk` data resources
 
-1. **Python Environment**: Ensure Python 3.9+ is installed.
-2. **Installation**:
-   ```bash
-   pip install -r backend/requirements.txt
-   ```
-3. **ML Models**: Ensure `trained_ML_models/` folder contains SVM and FastText models (see current structure).
-4. **Run Server**:
-   ```bash
-   python backend/main.py
-   ```
-   Or use the run scripts: `run_backend.sh` or `run_backend.bat`.
+### Backend Installation
+1.  Navigate into the `backend/` directory.
+2.  Install required dependencies:
+    ```bash
+    pip install -r backend/requirements.txt
+    ```
+3.  The ML models should be located in `trained_ML_models/` as categorized by FastText and SVM directories.
 
-## Frontend Setup
+### Frontend Installation
+1.  Navigate into the `frontend/` directory.
+2.  Install npm packages:
+    ```bash
+    npm install
+    ```
 
-1. **Node.js**: Ensure Node.js is installed.
-2. **Installation**:
-   ```bash
-   cd frontend
-   npm install
-   ```
-3. **Run Dev Server**:
-   ```bash
-   npm run dev
-   ```
-   Or use the run scripts: `run_frontend.sh` or `run_frontend.bat`.
+---
 
-## API Endpoints
+## 🛠️ Usage
 
-### GET /filters
-Returns available filter fields for patient data.
+For convenience, ready-to-use launch scripts are provided for both Windows and Linux/Bash.
 
-**Example Response:**
-```json
-[
-  {"id": "Age (Days)", "label": "Age (Days)", "type": "number"},
-  {"id": "Diagnosis", "label": "Diagnosis", "type": "text"},
-  {"id": "Female", "label": "Female", "type": "boolean"},
-  ...
-]
-```
+- **To run the Backend**: Run `run_backend.sh` or `run_backend.bat`.
+- **To run the Frontend**: Run `run_frontend.sh` or `run_frontend.bat`.
 
-### POST /match
-Accepts patient filters and returns ranked trial results.
+Once both services are running, the application will be accessible at: `http://localhost:5173`.
 
-**Request Body Body:**
-```json
-{
-  "filters": {
-    "Age (Days)": 5000,
-    "Diagnosis": "Relapsed ALL",
-    "Performance Status (Lanksy/Karnofsky)": 80
-  }
-}
-```
+### Backend API Endpoints
 
-**Response Body:**
-```json
-{
-  "results": [
-    {
-      "trial_id": "NCT00002547",
-      "trial_name": "NCT00002547",
-      "match_score": 0.85,
-      "criteria_summary": "DISEASE CHARACTERISTICS: The following hematologic malignancies are eligible...",
-      "trial_link": "https://clinicaltrials.gov/ct2/show/NCT00002547"
-    },
-    ...
-  ]
-}
-```
+| Endpoint | Method | Description |
+| :------- | :----- | :---------- |
+| `/filters` | `GET` | Fetches all available patient data filters used for matching. |
+| `/match` | `POST` | Processes patient characteristics and returns a ranked list of trial matches. |
 
-## Testing Steps
+---
 
-1. Start the backend: `run_backend.bat`.
-2. Start the frontend: `run_frontend.bat`.
-3. Open `http://localhost:5173` in your browser.
-4. Search for "Age" and "Diagnosis" in the search bar.
-5. Enter values (e.g., Age: 5000, Diagnosis: ALL).
-6. Click "Find Matching Trials".
-7. Verify results appear in the table with match scores.
+## 📈 Methodology
 
-## Project Structure
+The matching engine follows a robust four-step process:
+1.  **Trial Info Fetching**: Direct XML retrieval from `clinicaltrials.gov`.
+2.  **Criteria Extraction**: Segmenting text blocks into individual eligibility points.
+3.  **Classification**: Using SVMs to identify critical categories (e.g., Renal Function, Hepatic Function, CNS Involvement).
+4.  **Mathematical Scoring**: Calculating a composite score of matches vs. potentials, weighted by criteria relevance.
 
-```
-project-root/
-│
-├── backend/
-│   ├── main.py (FastAPI Server)
-│   ├── matching_engine_wrapper.py (ML Logic)
-│   ├── requirements.txt
-│
-├── frontend/ (Vite React App)
-│   ├── src/
-│   │   ├── pages/TrialMatchingPage.tsx
-│   │   └── index.css
-│
-├── trained_ML_models/ (Pre-trained classifiers & embeddings)
-├── project_data/ (CSV datasets & sample data)
-├── jupyter_notebooks/ (Original research notebooks)
-├── run_backend.sh/bat
-├── run_frontend.sh/bat
-└── README.md
-```
+---
+
+## 🤝 Contributions
+
+We welcome contributions from the community! Please ensure that any PRs follow the existing architecture and includes tests for any new matching logic categories.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details (if available).
+
+## Project Maintainer Note
+This modern UI is an enhancement designed for efficiency in clinical settings, maintaining full stability with the original GEARBOx NLP research models.
