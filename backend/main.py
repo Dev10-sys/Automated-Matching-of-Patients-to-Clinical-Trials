@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="GEARBOx Clinical Trial Matching API")
 
 # Setup folder paths
-BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-STATIC_DIR = os.path.join(BACKEND_DIR, "static")
-BASE_DIR = os.path.dirname(BACKEND_DIR)
+STATIC_DIR = r"C:\Users\LOQ\New folder\Automated-Matching-of-Patients-to-Clinical-Trials\backend\static"
+BASE_DIR = r"C:\Users\LOQ\New folder\Automated-Matching-of-Patients-to-Clinical-Trials"
+BACKEND_DIR = os.path.join(BASE_DIR, "backend")
 
 # Add CORS middleware
 app.add_middleware(
