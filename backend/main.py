@@ -167,14 +167,13 @@ async def match_trials(patient_data: PatientData):
         raise HTTPException(status_code=500, detail=str(e))
 
 # Serve Frontend
-if os.path.exists(STATIC_DIR):
-    # Specifically handle root to serve index.html
-    @app.get("/")
-    async def read_index():
-        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
-    
-    # Mount everything else (assets, etc.)
-    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
+# Specifically handle root to serve index.html
+@app.get("/")
+async def read_index():
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+# Mount everything else (assets, etc.)
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)
