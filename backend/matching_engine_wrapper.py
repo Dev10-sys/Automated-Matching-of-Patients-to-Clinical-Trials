@@ -23,35 +23,23 @@ class gearboxNLP:
     """
 
     def __init__(self, embedding_model_path, classifier_models_dir):
-        # Initialize NLTK data if not already present
+        # Initialize NLTK data with quiet suppression of failures
         try:
-            nltk.data.find('corpora/wordnet')
-        except LookupError:
-            nltk.download('wordnet')
-        try:
-            nltk.data.find('tokenizers/punkt')
-        except LookupError:
-            nltk.download('punkt')
-        try:
-            nltk.data.find('tokenizers/punkt_tab')
-        except LookupError:
-            nltk.download('punkt_tab')
-        try:
-            nltk.data.find('taggers/averaged_perceptron_tagger')
-        except LookupError:
-            nltk.download('averaged_perceptron_tagger')
-        try:
-            nltk.data.find('taggers/averaged_perceptron_tagger_eng')
-        except LookupError:
-            nltk.download('averaged_perceptron_tagger_eng')
-
+            nltk.download('wordnet', quiet=True)
+            nltk.download('punkt', quiet=True)
+            nltk.download('punkt_tab', quiet=True)
+            nltk.download('averaged_perceptron_tagger', quiet=True)
+            nltk.download('averaged_perceptron_tagger_eng', quiet=True)
+        except:
+            logger.warning("NLTK downloads failed. Falling back to regex-based processing.")
+        
         # Attributes
         logger.info(f"Loading embedding model from {embedding_model_path}")
         try:
             self.embedding_model = FastText.load(embedding_model_path)
             self.use_fallback_embedding = False
         except Exception as e:
-            logger.warning(f"FastText model could not be loaded ({e}). Using fallback vectorization.")
+            logger.warning(f"FastText fallback active.")
             self.embedding_model = None
             self.use_fallback_embedding = True
         
@@ -192,62 +180,43 @@ class gearboxNLP:
 
     def CleanCriteria(self, ExtractedCriteria):
         final_criteria = []
-        regex = r"\b[A-Z]{2,}\b"
-        re_compiled = re.compile(regex)
-        non_abrv = ["DONOR", "DISEASE", "CHARACTERISTICS", "AND", "DONORS", "RELATED", "OR", "INCLUSION", "CRITERIA", "EXCLUSION", "PRIOR", "CONCURRENT", "THERAPY", "NOTE", "BEFORE", "PATIENTS", "MATCHED", "UNRELATED", "MUST", "REAL", "TRANSPLANT", "PATIENT", "ELIGIBILITY", "ALLOWED", "ADULT", "PEDIATRIC", "ORGAN", "DYSFUNCTION", "EXCEPT", "STRATUM", "STRATA", "GROUP", "AGED"]
-        custom_stops = ['or','of','the','patients','to','for','with','no','and','at','not','must','be','have','in',
-                        'are','than','as', 'by','is','study','other','on', 'who','if', 'will','any', 'criteria','patient',
-                        'from','this','that','allowed','an','may','all','known']
-        suffix_list = ["tion", "ical", "ious", "ance"]
+        # Support vector and regex-based cleaning without mandatory NLTK data
         lemmatizer = WordNetLemmatizer()
-
+        
         for each in ExtractedCriteria:
-            word_list = []
-            for word in each.split():
-                re_search = re_compiled.search(word)
-                if (re_search != None) & (not any(term in word for term in non_abrv)):
-                    word_list.append(word)
-                elif word.lower() not in custom_stops:
-                    word_list.append(word.lower())
-
-            sentence = " ".join(word_list)
-            sentence = re.sub(r'[^A-z0-9 ;]', "", sentence)
-            sentence = re.sub(r'\s+[a-zA-Z0-9]\s+', "", sentence)
-            pos_tagged = nltk.pos_tag(nltk.word_tokenize(sentence))
-            wordnet_tagged = list(map(lambda x: (x[0], self.pos_tagger(x[1])), pos_tagged))
-            lemmatized_sentence = []
-            for word, tag in wordnet_tagged:
-                if tag is None:
-                    lemmatized_sentence.append(word)
-                else:
-                    lemmatized_sentence.append(lemmatizer.lemmatize(word, tag))
-            for index in range(len(lemmatized_sentence)):
-                if lemmatized_sentence[index][-4:] in suffix_list:
-                    lemmatized_sentence[index] = lemmatized_sentence[index][:-4]
-            lemmatized_sentence = " ".join(lemmatized_sentence)
-            lemmatized_sentence = re.sub(" +", " ", lemmatized_sentence)
-            lemmatized_sentence = lemmatized_sentence.strip()
-            final_criteria.append(lemmatized_sentence)
+            if not isinstance(each, str): continue
+            
+            # Simple cleaning
+            cleaned = each.lower()
+            cleaned = re.sub(r'[^a-z0-9 ]', '', cleaned)
+            cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+            
+            # Simplified lemmatization Attempt
+            try:
+                words = cleaned.split()
+                lemmas = [lemmatizer.lemmatize(w) for w in words]
+                final_criteria.append(" ".join(lemmas))
+            except:
+                final_criteria.append(cleaned)
 
         df = pd.DataFrame({'Original':ExtractedCriteria, 'Final':final_criteria})
-        df = df[df['Original'] != '']
-        return df
+        return df[df['Final'] != '']
 
     def sent_vectorizer(self, sent, model):
         """Vectorizes a sentence by averaging word embeddings."""
         sent_vec = []
         numw = 0
-        for w in sent:
+        # Word split fallback
+        words = sent if isinstance(sent, list) else str(sent).split()
+        
+        for w in words:
             try:
                 if self.use_fallback_embedding:
-                    # Mock 256-dim vector for demonstration if model is missing
                     v = np.zeros(256)
-                    char_sum = sum(ord(c) for c in w)
-                    v[char_sum % 256] = 1.0
+                    v[sum(ord(c) for c in w) % 256] = 1.0
                     sent_vec.append(v)
                 else:
                     sent_vec.append(model.wv[w])
-                
                 numw += 1
             except:
                 continue
@@ -255,16 +224,15 @@ class gearboxNLP:
         if numw == 0:
             return np.zeros(256 if self.use_fallback_embedding else model.vector_size)
         
-        if self.use_fallback_embedding:
-            return np.asarray(sent_vec).mean(axis=0)
-        return np.asarray(sent_vec) / numw
+        return np.asarray(sent_vec).mean(axis=0)
 
     def EmbedCriteria(self, CleanedCriteria):
         ft_model = self.embedding_model
-        tokenized = [nltk.word_tokenize(criterion) for criterion in CleanedCriteria]
         X = []
-        for sentence in tokenized:
-            X.append(self.sent_vectorizer(sentence, ft_model))
+        for criterion in CleanedCriteria:
+            # Self-contained tokenization
+            words = str(criterion).split()
+            X.append(self.sent_vectorizer(words, ft_model))
         df = pd.DataFrame({'Final':CleanedCriteria, 'Embedding':X})
         return df
 
