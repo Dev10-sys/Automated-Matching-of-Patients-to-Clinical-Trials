@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pydantic
+pandas
+numpy
+nltk
+gensim
+joblib
+python-docx
+requests
+scikit-learn

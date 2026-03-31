@@ -1,0 +1,16 @@
+{
+  "filters": {
+    "Age (Days)": 5000,
+    "Height (cm)": 150,
+    "Performance Status (Lanksy/Karnofsky)": 90,
+    "Diagnosis": "Relapsed ALL",
+    "Female": true,
+    "African-American": false,
+    "Creatinine (mg/dL)": 0.8,
+    "CNS Involvement (1/2/3)": 1,
+    "Isolated CNS Disease": false,
+    "Days Since Cytotoxic Chemotherapy": 30,
+    "Active and/or Uncontrolled Viral, Bacterial, or Fungal Infection": false,
+    "Pregnant, Nursing, or Fertile and Unwilling to Use Contraception": false
+  }
+}
